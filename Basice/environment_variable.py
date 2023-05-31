@@ -5,7 +5,7 @@ pathOfNode = 'C:\\Users\\Administrator\\Desktop\\临时文件\\node.pic'
 ruiboshi_excel = "C:\\Users\\Administrator\\Desktop\\临时文件\\dict_ruiboshi.xlsx"
 
 # log_info 存储位置
-filename=f'C:\\Users\\Administrator\\Desktop\\logs\\'
+filename = f'C:\\Users\\Administrator\\Desktop\\logs\\'
 
 # adb下载目录
 adb_download = 'C:\\Users\\Administrator\\Desktop\\video\\'
@@ -14,7 +14,10 @@ adb_download = 'C:\\Users\\Administrator\\Desktop\\video\\'
 p6slite_videos = '/sdcard/Movies/P6SLite/videos/'
 
 # 相册
-photo_album = '/sdcard/DCIM/Camera'
+photo_album = '/sdcard/DCIM/Camera/'
 
-# 存储
+# 存储睿博士邻接表
 cmri_excel_element_dict = "C:\\Users\\Administrator\\Desktop\\临时文件\\cmri_element_dict.xlsx"
+
+# 存储睿博士截图文件路径
+ruibo_screenshot_path = '/sdcard/Pictures/P6SLite/screenshot/'

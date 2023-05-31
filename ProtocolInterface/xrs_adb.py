@@ -1,3 +1,4 @@
+import difflib
 import os, re
 import socket
 import subprocess
@@ -13,7 +14,9 @@ command_dict = {
     '获取安卓版本': 'adb shell getprop ro.build.version.release',
     '获取手机分辨率': 'adb shell wm size',
     '滑屏解锁': 'adb shell input swipe 300 1000 300 500',
-    '密码解锁': 'adb shell input text password'
+    '密码解锁': 'adb shell input text password',
+    '下载睿博士截图': f'adb pull {env.ruibo_screenshot_path} {env.adb_download}',
+    '清空睿博士截图': f'adb shell rm {env.ruibo_screenshot_path}*',
 }
 
 
@@ -94,5 +97,14 @@ def start_app(package_name='', activity_name=''):
     print(f'{package_name} 启动成功！')
 
 
+def get_audio_logs():
+    # 使用 adb 命令获取音频输入信息
+    result = subprocess.check_output("adb shell dumpsys audio", shell=True).decode()
+    # 在音频输入信息中查找 "source: default"
+    return result
+
+
 if __name__ == "__main__":
-    start_app('com.zwcode.p6slite', '.activity.SplashActivity')
+    # 重启app
+    # start_app('com.zwcode.p6slite', '.activity.SplashActivity')
+    print(get_audio_logs())

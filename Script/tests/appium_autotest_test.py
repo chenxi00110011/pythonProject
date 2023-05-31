@@ -2,8 +2,10 @@
 # 模块内容：基于appium的自动化测试
 # -*- coding: utf-8 -*-
 import time, os, shutil
-from imports import MobieProject, pytest, xrs_adb, xrs_app, getMp4Information
-from imports import adb_download, serial_bitstream
+
+import environment_variable
+from imports import MobieProject, pytest, xrs_adb, getMp4Information
+from imports import adb_download, serial_bitstream, image_properties
 
 """
 优化：
@@ -194,16 +196,109 @@ def test_share_feature(setup_environment):
 
 
 @pytest.mark.network
-@pytest.mark.repeat(1)
-@pytest.mark.flaky(reruns=2, reruns_delay=1)
-def test_4G_data_query(setup_environment:MobieProject):
-    # 此处编写测试代码，查询4G流量的结果是否与实际情况一致
-    # 测试代码一般包括测试准备、测试步骤、测试断言
+@pytest.mark.repeat(10)
+@pytest.mark.flaky(reruns=1, reruns_delay=1)
+def test_4G_data_query(setup_environment: MobieProject):
+    """此处编写测试代码，查询4G流量的结果是否与实际情况一致"""
     project = setup_environment
     project.goto('4G流量详情页')
-    pattern = r'^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$'
-    # project.driver.find_element_by_android_uiautomator(
-    #                     f'new UiSelector().text("已用：{pattern}GB剩余：无限量")')
+    pattern = r'\d+\.\d+'
     assert project.is_element_exist('正使用')  # 检查卡状态
     assert project.is_element_exist(f'已用：{pattern}GB剩余：无限量')  # 检查流量
 
+
+@pytest.mark.audio
+@pytest.mark.repeat(1)
+# @pytest.mark.flaky(reruns=1, reruns_delay=1)
+def test_intercom(setup_environment: MobieProject):
+    # 测试对讲的代码写在这里
+    project = setup_environment
+    text1 = xrs_adb.get_audio_logs()
+    assert ('type:android.media.AudioTrack' not in text1)  # 检查是否播放过音频
+    assert ('src:MIC pack:com.zwcode.p6slite' not in text1)  # 检查是否采集声音
+    project.goto('直播页')
+    project.clickControl('声音', 'text')
+    time.sleep(10)
+    project.clickControl('声音', 'text')
+    text2 = xrs_adb.get_audio_logs()
+    assert ('type:android.media.AudioTrack' in text2)  # 检查是否播放过音频
+    project.long_press_element_by_uiautomator('对讲', 5000)
+    text3 = xrs_adb.get_audio_logs()
+    assert ('src:MIC pack:com.zwcode.p6slite' in text3)  # 检查是否采集声音
+
+
+def test_camera_rotation():
+    # 云台转动，目前不方便检查转动的结果
+    # 测试摄像头转动的代码写在这里
+    pass
+
+
+def test_camera_position_memory():
+    # 场景记忆
+    # 测试记住摄像头当前位置的代码写在这里
+    pass
+
+
+def test_cruise_control():
+    # 测试巡航的代码写在这里
+    pass
+
+
+@pytest.mark.live
+@pytest.mark.smoke
+@pytest.mark.repeat(1)
+@pytest.mark.parametrize("definition", definitions.keys())
+@pytest.mark.flaky(reruns=1, reruns_delay=1)
+def test_screenshot(definition, setup_environment):
+    # 测试截图的代码写在这里
+    project = setup_environment
+    project.goto('直播页')
+    os.system(xrs_adb.command_dict['清空睿博士截图'])
+    project.clickControl('画质', 'text')
+    project.clickControl(definition, 'text')
+    project.clickControl('截图', 'text')
+    os.system(xrs_adb.command_dict['下载睿博士截图'])
+    folder_path = environment_variable.adb_download + 'screenshot'
+    image_properties_list = image_properties.get_all_image_properties(folder_path)  # 获取pc存储截图目录下的所有图片参数，返回列表
+    assert image_properties_list[0]['size'] == definitions[definition]  # 断言，检查截图分辨率
+    shutil.rmtree(folder_path)  # 删除pc端存储截图的文件夹
+
+
+def test_dash_cam_recording():
+    # 检查卡录像的代码写在这
+    pass
+
+
+def test_device_info():
+    # 检查设备信息的代码写在这里
+    pass
+
+
+def test_timezone():
+    # 检查时区的代码写在这里
+    pass
+
+
+def test_sleep_mode():
+    # 测试休眠的代码写在这里
+    pass
+
+
+def test_reset_to_defaults():
+    # 执行恢复出厂设置的操作，示例代码：
+    pass
+
+
+def test_event_report():
+    # 执行事件上报，示例代码：
+    pass
+
+
+def test_volume():
+    # 检查音量的代码写在这里
+    pass
+
+
+def test_human_tracking():
+    # 测试追踪功能的代码写在这里
+    pass

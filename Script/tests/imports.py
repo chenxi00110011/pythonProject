@@ -26,3 +26,5 @@ from xrs_serial import serial_bitstream
 import pytest
 import xrs_adb
 import xrs_app
+import image_properties
+

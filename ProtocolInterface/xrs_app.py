@@ -1,10 +1,13 @@
 # coding=utf-8
 import os
+import re
+from appium.webdriver.common.touch_action import TouchAction
+from selenium.webdriver.remote.webelement import WebElement
 from appium import webdriver
 from adjacency_list import LinkedGraph
 from my_decorator import retry
 from data_store import toDictV5
-from environment_variable import ruiboshi_excel,cmri_excel_element_dict
+from environment_variable import ruiboshi_excel, cmri_excel_element_dict
 import time
 import xrs_adb
 import openpyxl
@@ -54,8 +57,10 @@ class MobieProject:
         time.sleep(10)  # 等待app启动
         self.mobile_phone = None
         self.LinkedGraph = LinkedGraph()  # 创建邻接表
-        if app_name == '睿博士':self.allElemDict = toDictV5(ruiboshi_excel)  # 缓存pwd的页面元素
-        elif app_name == '和家亲':self.allElemDict = toDictV5(cmri_excel_element_dict)  # 缓存pwd的页面元素
+        if app_name == '睿博士':
+            self.allElemDict = toDictV5(ruiboshi_excel)  # 缓存pwd的页面元素
+        elif app_name == '和家亲':
+            self.allElemDict = toDictV5(cmri_excel_element_dict)  # 缓存pwd的页面元素
         time.sleep(WAITTIME)
 
     def __returnAppPackName(self, app, desired_caps):
@@ -172,8 +177,10 @@ class MobieProject:
                 souce = self.driver.page_source
             else:
                 souce = page_source
-            if element in souce:
+            if re.search(element, souce):  # 通过正则表示判断
                 return True
+            # if element in souce:
+            #     return True
             else:
                 count += 1
                 time.sleep(wait)
@@ -248,7 +255,7 @@ class MobieProject:
                     new = self.driver.page_source
         return found
 
-    def get_element_data(self,element, excel_file_path, vertex_name):
+    def get_element_data(self, element, excel_file_path, vertex_name):
         """
            获取App页面元素数据，并将其存储在Excel文件中
            :param driver: WebDriver对象
@@ -271,13 +278,13 @@ class MobieProject:
             #         f'new UiSelector().text("{value}")')
             element_dict = {
                 '顶点': vertex_name,
-                '邻近点':None,
+                '邻近点': None,
                 'resource_id': element.get_attribute('resource-id'),
                 'bounds': element.get_attribute('bounds'),
                 'text': element.text,
                 'type': None,
                 'default_val': None,
-                'weight':1
+                'weight': 1
             }
             # 表头存储到excel
             # row_num = 1
@@ -297,6 +304,23 @@ class MobieProject:
             traceback.print_exc()
             print(e)
 
+    def long_press_element_by_uiautomator(self, selector, duration=2000):
+        """
+        在 Appium 中封装长按元素方法。
+
+        Args:
+            driver: WebDriver 实例
+            selector: 需要长按的 WebElement 对象的 UiSelector，可以是字符串或者 UiSelector 对象
+            duration: 长按持续时间，默认为 2000 毫秒
+
+        Returns:
+            None
+        """
+        if isinstance(selector, str):
+            selector = f'new UiSelector().text("{selector}")'
+        element = self.driver.find_element_by_android_uiautomator(selector)
+        action = TouchAction(self.driver)
+        action.long_press(element).wait(duration).release().perform()
 
 
 class App:
