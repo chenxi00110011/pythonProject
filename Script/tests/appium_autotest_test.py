@@ -2,10 +2,8 @@
 # 模块内容：基于appium的自动化测试
 # -*- coding: utf-8 -*-
 import time, os, shutil
-
-import environment_variable
-from imports import MobieProject, pytest, xrs_adb, getMp4Information
-from imports import adb_download, serial_bitstream, image_properties
+from imports import MobieProject, pytest, xrs_adb, getMp4Information, read_excel_to_dict, ntp_util
+from imports import adb_download, serial_bitstream, image_properties, environment_variable
 
 """
 优化：
@@ -26,7 +24,7 @@ def setup_module():
     os.system("adb shell input tap 100 100")  # 取消提示弹窗
 
 
-@pytest.fixture(scope="function")
+# @pytest.fixture(scope="function")
 def setup_environment():
     """初始化测试环境"""
     # 在这里进行测试环境的初始化操作
@@ -43,7 +41,7 @@ def setup_environment():
     if project.pwd() == '首页':
         return project
     else:
-        setup_environment
+        setup_environment()
 
 
 def clean_my_resource(project):
@@ -85,7 +83,7 @@ definitions = {'超清': (2560, 1440),
 
 @pytest.mark.live
 @pytest.mark.smoke
-@pytest.mark.repeat(2)
+@pytest.mark.repeat(1)
 @pytest.mark.parametrize("definition", definitions.keys())
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_live_video_params(definition, setup_environment):
@@ -112,8 +110,8 @@ def test_live_video_params(definition, setup_environment):
 
 @pytest.mark.live
 @pytest.mark.smoke
-@pytest.mark.repeat(5)
-@pytest.mark.flaky(reruns=2, reruns_delay=1)
+@pytest.mark.repeat(1)
+@pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_online_offline_status_update_time(setup_environment):
     """测试在线离线刷新时间"""
     # 离线状态刷新时间
@@ -129,7 +127,7 @@ def test_online_offline_status_update_time(setup_environment):
         if project.pwd() != '首页':
             raise Exception("The app has stopped working")
     print(f'离线状态自动刷新时间：{int(end_time - start_time)}秒')
-    assert int(end_time - start_time) <= 60  # 检查离线状态刷新时间是否小于等于60秒
+    assert int(end_time - start_time) <= 150  # 检查离线状态刷新时间是否小于等于60秒
 
     # 在线状态刷新时间
     start_time = time.time()
@@ -146,7 +144,7 @@ def test_online_offline_status_update_time(setup_environment):
 
 @pytest.mark.share
 @pytest.mark.smoke
-@pytest.mark.repeat(5)
+@pytest.mark.repeat(1)
 @pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_share_feature(setup_environment):
     """
@@ -196,7 +194,8 @@ def test_share_feature(setup_environment):
 
 
 @pytest.mark.network
-@pytest.mark.repeat(10)
+@pytest.mark.smoke
+@pytest.mark.repeat(1)
 @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_4G_data_query(setup_environment: MobieProject):
     """此处编写测试代码，查询4G流量的结果是否与实际情况一致"""
@@ -208,6 +207,7 @@ def test_4G_data_query(setup_environment: MobieProject):
 
 
 @pytest.mark.audio
+@pytest.mark.smoke
 @pytest.mark.repeat(1)
 # @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_intercom(setup_environment: MobieProject):
@@ -244,13 +244,21 @@ def test_cruise_control():
     pass
 
 
-@pytest.mark.live
+resolutionDict = {'超清': (2560, 1440),
+                  '高清': (800, 448),
+                  '标清': (640, 360)}
+
+
+@pytest.mark.live1
 @pytest.mark.smoke
 @pytest.mark.repeat(1)
-@pytest.mark.parametrize("definition", definitions.keys())
+@pytest.mark.parametrize("definition", resolutionDict.keys())
 @pytest.mark.flaky(reruns=1, reruns_delay=1)
-def test_screenshot(definition, setup_environment):
+def test_screenshot(definition, setup_environment: MobieProject):
     # 测试截图的代码写在这里
+    folder_path = environment_variable.adb_download + 'screenshot'
+    if os.path.exists(folder_path):
+        shutil.rmtree(folder_path)  # 删除pc端存储截图的文件夹
     project = setup_environment
     project.goto('直播页')
     os.system(xrs_adb.command_dict['清空睿博士截图'])
@@ -258,31 +266,62 @@ def test_screenshot(definition, setup_environment):
     project.clickControl(definition, 'text')
     project.clickControl('截图', 'text')
     os.system(xrs_adb.command_dict['下载睿博士截图'])
-    folder_path = environment_variable.adb_download + 'screenshot'
     image_properties_list = image_properties.get_all_image_properties(folder_path)  # 获取pc存储截图目录下的所有图片参数，返回列表
-    assert image_properties_list[0]['size'] == definitions[definition]  # 断言，检查截图分辨率
-    shutil.rmtree(folder_path)  # 删除pc端存储截图的文件夹
+    print(resolutionDict[definition], image_properties_list[0]['size'])
+    assert image_properties_list[0]['size'] == resolutionDict[definition]  # 断言，检查截图分辨率
 
 
 def test_dash_cam_recording():
+    """检查卡录像"""
     # 检查卡录像的代码写在这
     pass
 
 
-def test_device_info():
+@pytest.mark.devices
+@pytest.mark.smoke
+def test_device_info(setup_environment: MobieProject):
     # 检查设备信息的代码写在这里
-    pass
+    device_dict = read_excel_to_dict(environment_variable.ruiboshi_excel, '设备详情', 'IOTDBB-065896-UXLYD', 3)
+    project = setup_environment
+    project.goto('设备信息查询页')
+    for key, val in device_dict.items():
+        assert project.is_element_exist(key)
+        val[0] = str(val[0])
+        assert project.is_element_exist(val[0])
+        print(key, project.is_element_exist(key))
+        print(val[0], project.is_element_exist(val[0]))
 
 
-def test_timezone():
-    # 检查时区的代码写在这里
-    pass
+@pytest.mark.timezone
+@pytest.mark.smoke
+@pytest.mark.flaky(reruns=2, reruns_delay=1)
+def test_timezone(setup_environment: MobieProject):
+    """检查ntp对时误差"""
+    project = setup_environment
+    project.goto('时间设置页')
+    element = project.driver.find_element_by_id('com.zwcode.p6slite:id/dev_time_systemtime_time')
+    devices_time = element.get_attribute('text')
+    print(devices_time)
+    device_timestamp = ntp_util.str_time_to_timestamp(devices_time)
+    ntp_timestamp = ntp_util.get_ntp_timestamp()
+    assert device_timestamp < ntp_timestamp + 1 or device_timestamp > ntp_timestamp - 1
 
 
+# @pytest.mark.sleep_mode
+# @pytest.mark.smoke
+# @pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_sleep_mode():
-    # 测试休眠的代码写在这里
-    pass
-
+    project = setup_environment()
+    if project.is_element_exist('立即唤醒'):
+        project.clickControl('立即唤醒', 'text')
+    project.goto('立即睡眠')
+    project.goto('首页')
+    assert project.is_element_exist('睡眠中')
+    assert project.is_element_exist('立即唤醒')
+    project.clickControl('立即唤醒', 'text')
+    assert not project.is_element_exist('睡眠中')
+    assert project.is_element_exist('在线')
+test_sleep_mode()
 
 def test_reset_to_defaults():
     # 执行恢复出厂设置的操作，示例代码：

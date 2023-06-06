@@ -16,7 +16,7 @@ def get_image_properties_opencv(image_file):
     height, width, channels = image.shape
 
     properties = {
-        "size": f"{width}x{height}",
+        "size": (width, height),
         "channels": channels
     }
 

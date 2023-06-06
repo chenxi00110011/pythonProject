@@ -3,6 +3,7 @@ import time
 from data_store import toDictV1, toDictV2, toDictV3, toDictV4
 from collections import deque
 from environment_variable import ruiboshi_excel, cmri_excel_element_dict
+from collections import deque, defaultdict
 
 
 class Page:
@@ -145,7 +146,7 @@ class LinkedGraph(object):
                     searched.append(node)  # 将这个人标记为检查过
         return False
 
-    def dfs(self, initial, destination, searched=None, way=None, result=None):
+    def dfs_old(self, initial, destination, searched=None, way=None, result=None):
         '''
         深度优先搜索,用于找到所有的路径
         邻接表有问题会导致搜索结构出错
@@ -166,12 +167,6 @@ class LinkedGraph(object):
         search_queue = adjacencyList[initial]  # 当前位置的临近点
         searched.append(initial)  # searched 用于记录已搜索的点
         for node in search_queue:
-            # time.sleep(1)
-            # print('已搜索的点:',searched)
-            # print('所经过的路径:',way)
-            # print('当前位置:\t',initial)
-            # print('下一个节点位置:\t',node)
-            # print(search_queue)
             way.append(node)  # 记录定点到当前位置所经过的路径
             if node in searched:
                 way.pop()
@@ -186,13 +181,48 @@ class LinkedGraph(object):
             way.pop()
         return result
 
-    def get_road_sign(self, initial, destination):
+    def dfs(self, initial, destination, searched=None, way=None, result=None):
         '''
+        深度优先搜索,用于找到所有的路径
+        邻接表有问题会导致搜索结构出错
+        :param initial:
+        :param destination:
+        :param searched:
+        :param way:
+        :param result:
+        :return:
+        '''
+        if searched is None:
+            searched = []
+        if way is None:
+            way = deque()
+        if result is None:
+            result = defaultdict(list)
+
+        search_queue = self.adjacencyList[initial]  # 当前位置的临近点
+
+        searched.append(initial)  # searched 用于记录已搜索的点
+
+        for node in search_queue:
+            way.append(node)  # 记录定点到当前位置所经过的路径
+            if node in searched:
+                way.pop()
+                continue
+            elif node == destination:
+                result[initial] = list(way)
+            elif self.adjacencyList[node]:
+                self.dfs(node, destination, searched[:], way, result)
+            way.pop()
+
+        return dict(result)
+
+    def get_road_sign_old(self, initial, destination):
+        """
         由dfs()方法生成的路线，选取最短路径，返回路径跳转元素的list
         :param initial: 起点
         :param destination: 终点
         :return: list
-        '''
+        """
         all_road = self.dfs(initial, destination)
         all_road_len = []
         if len(all_road) == 1:
@@ -213,7 +243,35 @@ class LinkedGraph(object):
                     result += v.neighbor[c2]
         return result
 
+    def get_road_sign(self, initial, destination):
+        """
+        由dfs()方法生成的路线，选取最短路径，返回路径跳转元素的list
+        :param initial: 起点
+        :param destination: 终点
+        :return: list
+        """
+        all_road = self.dfs(initial, destination)
+        len_road = [len(x) for x in all_road.values()]
+        shortest_idx = min(range(len(len_road)), key=len_road.__getitem__)
+        keyList = list(all_road.keys())
+        shortest_road = all_road[keyList[shortest_idx]]
+        road = [initial] + shortest_road
+
+        result = []
+        for c1, c2 in zip(road[:-1], road[1:]):
+            for vertex in self.listVex:
+                if vertex.pageName == c1:
+                    result += vertex.neighbor[c2]
+        return result
 
 if __name__ == "__main__":
     g = LinkedGraph()
-    print(g.get_road_sign('4G流量详情页','首页'))
+    # for frist in g.listVex:
+    #     for end in g.listVex:
+    #
+    #         if frist.pageName != end.pageName:
+    #             if not g.dfs(frist.pageName, end.pageName):
+    #                 print(frist.pageName, end.pageName)
+    #                 print(g.dfs(frist.pageName, end.pageName))
+    #                 print("-------------------------------")
+    print(g.get_road_sign('设置页', '首页'))

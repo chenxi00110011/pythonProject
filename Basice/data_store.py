@@ -1,7 +1,8 @@
-import json, os
+import json
+import os
 import time
-
-from openpyxl import Workbook, load_workbook
+import openpyxl
+from openpyxl import load_workbook
 from environment_variable import ruiboshi_excel
 
 dataFile = "./date_dict.txt"
@@ -251,8 +252,30 @@ def toDictV5(excel_url):
         i += 1
     return return_dict
 
+
+def read_excel_to_dict(excel_path, worksheet_name, did, did_col=0):
+    # 加载 Excel 文件
+    wb = openpyxl.load_workbook(excel_path)
+
+    # 获取指定工作表
+    sheet = wb[worksheet_name]
+
+    # 获取表头行，并创建字典键
+    headers = [cell.value for cell in sheet[1]]
+    result = {header: [] for header in headers}
+
+    # 读取数据，填充字典值
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+
+        if row[did_col] == did:
+            for header, value in zip(headers, row):
+                result[header].append(value)
+
+    # 返回字典结果
+    return result
+
 if __name__ == '__main__':
-    print(toDictV5(ruiboshi_excel))
+    print(read_excel_to_dict(ruiboshi_excel, '设备详情', 'IOTDBB-065896-UXLYD', 3))
     # new_dict = {'COM5':'456'}
     # writeToFile(new_dict)
 
