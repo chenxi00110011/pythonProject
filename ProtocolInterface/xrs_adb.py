@@ -1,5 +1,6 @@
 import difflib
 import os, re
+import shutil
 import socket
 import subprocess
 import time
@@ -17,6 +18,8 @@ command_dict = {
     '密码解锁': 'adb shell input text password',
     '下载睿博士截图': f'adb pull {env.ruibo_screenshot_path} {env.adb_download}',
     '清空睿博士截图': f'adb shell rm {env.ruibo_screenshot_path}*',
+    '下载手机截屏': f'adb pull {env.mobile_screen_capture} {env.adb_download}',
+
 }
 
 
@@ -44,6 +47,7 @@ def popen(command):
 
 
 def get_screen_resolution():
+    """获取手机屏幕分辨率"""
     result = popen('获取手机分辨率')
     devices_name = re.findall('\d{3,4}', result, re.S)
     devices_name = (eval(devices_name[0]), eval(devices_name[1]))
@@ -104,7 +108,47 @@ def get_audio_logs():
     return result
 
 
+def remove_path(path):
+    """
+    删除指定路径及其所有子文件和子文件夹
+
+    Args:
+        path: 要删除的路径
+
+    Returns:
+        None
+    """
+    if os.path.exists(path):
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+        print(f"已删除路径：{path}")
+    else:
+        print(f"指定路径不存在：{path}")
+
+
+def pinch_zoom(start, end, scale_factor=2.0, press_duration=500):
+    start_x, start_y = start
+    end_x, end_y = end
+
+    # 模拟第一根手指按下屏幕
+    os.system(f"adb shell input touchscreen tap {start_x} {start_y}")
+
+    # 模拟第二根手指按下屏幕并滑动到位置
+    x1, y1 = (end_x, end_y)
+    x2, y2 = (int(x1 + (scale_factor - 1) * 50), int(y1))
+    os.system(f"adb shell input touchscreen tap {x1} {y1} && adb shell input touchscreen swipe {x1} {y1} {x2} {y2} {int(press_duration / 2)}")
+
+    # 模拟两个手指同时离开屏幕
+    os.system(f"adb shell input touchscreen tap {x1} {y1} && adb shell input touchscreen tap {start_x} {start_y}")
+    time.sleep(1)
+    os.system(f"adb shell input touchscreen tap {start_x} {start_y}")
+
+
 if __name__ == "__main__":
     # 重启app
     # start_app('com.zwcode.p6slite', '.activity.SplashActivity')
-    print(get_audio_logs())
+    # os.system(command_dict['下载手机截屏'])
+    # pinch_zoom((400,1065),(600,1065))
+    print(get_screen_resolution())

@@ -21,3 +21,6 @@ cmri_excel_element_dict = "C:\\Users\\Administrator\\Desktop\\临时文件\\cmri
 
 # 存储睿博士截图文件路径
 ruibo_screenshot_path = '/sdcard/Pictures/P6SLite/screenshot/'
+
+# 存储手机截屏路径
+mobile_screen_capture = '/sdcard/DCIM/Screenshots'

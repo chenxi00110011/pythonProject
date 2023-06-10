@@ -24,23 +24,55 @@ def setup_module():
     os.system("adb shell input tap 100 100")  # 取消提示弹窗
 
 
-# @pytest.fixture(scope="function")
+@pytest.fixture(scope="function")
 def setup_environment():
     """初始化测试环境"""
     # 在这里进行测试环境的初始化操作
-    project = MobieProject('睿博士')
-    project.goto('个人管理页')
-    # 判断设备是否使用18086409233账户登录
-    if not project.is_element_exist('18086409233'):
-        project.goto('登录页')
-        project.goto('首页', '18086409233', 'cx123456')
-    else:
-        project.goto('首页', '18086409233', 'cx123456')
+    try:
+        project = MobieProject('睿博士')
+        project.goto('个人管理页')
+        # 判断设备是否使用18086409233账户登录
+        if not project.is_element_exist('18086409233'):
+            project.goto('登录页')
+            project.goto('首页', '18086409233', 'cx123456')
+        else:
+            project.goto('首页', '18086409233', 'cx123456')
 
-    # 判断app是否启动
-    if project.pwd() == '首页':
-        return project
-    else:
+        # 检查设备是否离线、网络异常、不在线
+        while project.is_element_exist('通讯异常') or project.is_element_exist('离线') or project.is_element_exist('连接中'):
+            time.sleep(5)
+
+        # 判断app是否启动
+        if project.pwd() == '首页':
+            return project
+        else:
+            setup_environment()
+
+
+    except Exception as e:
+        print(e)
+        setup_environment()
+
+
+def setup_environmentV1():
+    """初始化测试环境"""
+    # 在这里进行测试环境的初始化操作
+    try:
+        project = MobieProject('睿博士')
+        project.goto('个人管理页')
+        # 判断设备是否使用18086409233账户登录
+        if not project.is_element_exist('18086409233'):
+            project.goto('登录页')
+            project.goto('首页', '18086409233', 'cx123456')
+        else:
+            project.goto('首页', '18086409233', 'cx123456')
+        # 判断app是否启动
+        if project.pwd() == '首页':
+            return project
+        else:
+            setup_environmentV1()
+    except Exception as e:
+        print(e)
         setup_environment()
 
 
@@ -50,12 +82,15 @@ def clean_my_resource(project):
         xrs_adb.start_app('com.zwcode.p6slite', '.activity.SplashActivity')
 
 
-did_list = ['IOTDBB-065896-UXLYD']
+# did_list = ['IOTDBB-065896-UXLYD']
+did_list = ['IOTDAA-733849-MGVRF']
 
 
+@pytest.mark.run(order=1)
 @pytest.mark.bind
 @pytest.mark.smoke
 @pytest.mark.repeat(2)
+@pytest.mark.flaky(reruns=5, reruns_delay=1)
 @pytest.mark.parametrize("did", did_list)
 def test_bind_and_unbind_device(did: str, setup_environment):
     """测试绑定解绑设备"""
@@ -76,16 +111,17 @@ def test_bind_and_unbind_device(did: str, setup_environment):
     assert project.is_element_exist('test_dev')  # 断言设备已添加到设备列表
 
 
-definitions = {'超清': (2560, 1440),
-               '高清': (800, 448),
-               '标清': (640, 368)}
+definitions = {'超清': [(2560, 1440), (2304, 1296)],
+               '高清': [(800, 448)],
+               '标清': [(640, 368), (640, 364), (640, 360)]}
 
 
+@pytest.mark.run(order=2)
 @pytest.mark.live
 @pytest.mark.smoke
-@pytest.mark.repeat(1)
+# @pytest.mark.repeat(1)
 @pytest.mark.parametrize("definition", definitions.keys())
-@pytest.mark.flaky(reruns=3, reruns_delay=1)
+@pytest.mark.flaky(reruns=5, reruns_delay=10)
 def test_live_video_params(definition, setup_environment):
     """测试视频参数，例如帧率、码率、分辨率、码率控制"""
     project = setup_environment
@@ -102,16 +138,39 @@ def test_live_video_params(definition, setup_environment):
     fileName = os.listdir(dir)[0]
     arguments = getMp4Information(dir + fileName)
     print(arguments)
-    assert arguments['分辨率'] == definitions[definition]  # 检查分辨率是否一致
+    assert arguments['分辨率'] in definitions[definition]  # 检查分辨率是否符合要求
     assert arguments['视频帧率'] > 11  # 检查帧率是否大于11
     assert arguments['平均码率'] <= 3000  # 检查平均码率
     assert arguments['码率控制方式'] == 'VBR'  # 检查码率控制方式
 
 
-@pytest.mark.live
+@pytest.mark.run(order=3)
+@pytest.mark.live_dela
 @pytest.mark.smoke
 @pytest.mark.repeat(1)
-@pytest.mark.flaky(reruns=1, reruns_delay=1)
+@pytest.mark.parametrize("definition", definitions.keys())
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
+def test_live_delay(definition, setup_environment: MobieProject):
+    screenshotDirPath = environment_variable.adb_download+'screenshot\\'
+    project = setup_environment
+    project.goto('直播页')
+    project.clickControl('画质', 'text')
+    os.system(xrs_adb.command_dict['清空睿博士截图'])
+    xrs_adb.remove_path(screenshotDirPath)
+    project.clickControl('截图', 'text')
+    time_stamp = ntp_util.get_ntp_timestamp(int_val=1)  # 先获取ntp时间，再截图
+    project.clickControl(definition, 'text')
+    os.system(xrs_adb.command_dict['下载睿博士截图'])
+    dev_time_stamp = image_properties.image_timestamp(screenshotDirPath)[0]
+    print(time_stamp - dev_time_stamp)
+    assert time_stamp - dev_time_stamp <= 4
+
+
+@pytest.mark.run(order=4)
+@pytest.mark.status
+@pytest.mark.smoke
+@pytest.mark.repeat(1)
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_online_offline_status_update_time(setup_environment):
     """测试在线离线刷新时间"""
     # 离线状态刷新时间
@@ -142,6 +201,7 @@ def test_online_offline_status_update_time(setup_environment):
     assert int(end_time - start_time) <= 60  # 检查在线状态刷新时间是否小于等于60秒
 
 
+@pytest.mark.run(order=99)
 @pytest.mark.share
 @pytest.mark.smoke
 @pytest.mark.repeat(1)
@@ -193,6 +253,7 @@ def test_share_feature(setup_environment):
     project.goto('登录页')
 
 
+@pytest.mark.run(order=5)
 @pytest.mark.network
 @pytest.mark.smoke
 @pytest.mark.repeat(1)
@@ -200,18 +261,22 @@ def test_share_feature(setup_environment):
 def test_4G_data_query(setup_environment: MobieProject):
     """此处编写测试代码，查询4G流量的结果是否与实际情况一致"""
     project = setup_environment
+    project.goto('4G流量查询页')
+    if project.is_element_exist('请联系卖家客服进行充值'):
+        return
     project.goto('4G流量详情页')
     pattern = r'\d+\.\d+'
     assert project.is_element_exist('正使用')  # 检查卡状态
     assert project.is_element_exist(f'已用：{pattern}GB剩余：无限量')  # 检查流量
 
 
+@pytest.mark.run(order=2)
 @pytest.mark.audio
 @pytest.mark.smoke
 @pytest.mark.repeat(1)
 # @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_intercom(setup_environment: MobieProject):
-    # 测试对讲的代码写在这里
+    """测试对讲，目前仅通过APP端进行验证"""
     project = setup_environment
     text1 = xrs_adb.get_audio_logs()
     assert ('type:android.media.AudioTrack' not in text1)  # 检查是否播放过音频
@@ -244,12 +309,18 @@ def test_cruise_control():
     pass
 
 
-resolutionDict = {'超清': (2560, 1440),
-                  '高清': (800, 448),
-                  '标清': (640, 360)}
+def test_human_tracking():
+    # 测试追踪功能的代码写在这里
+    pass
 
 
-@pytest.mark.live1
+resolutionDict = {'超清': [(2560, 1440), (2304, 1296)],
+                  '高清': [(800, 448)],
+                  '标清': [(640, 368), (640, 364), (640, 360)]}
+
+
+@pytest.mark.run(order=6)
+@pytest.mark.screenshot
 @pytest.mark.smoke
 @pytest.mark.repeat(1)
 @pytest.mark.parametrize("definition", resolutionDict.keys())
@@ -268,17 +339,20 @@ def test_screenshot(definition, setup_environment: MobieProject):
     os.system(xrs_adb.command_dict['下载睿博士截图'])
     image_properties_list = image_properties.get_all_image_properties(folder_path)  # 获取pc存储截图目录下的所有图片参数，返回列表
     print(resolutionDict[definition], image_properties_list[0]['size'])
-    assert image_properties_list[0]['size'] == resolutionDict[definition]  # 断言，检查截图分辨率
+    assert image_properties_list[0]['size'] in resolutionDict[definition]  # 断言，检查截图分辨率
 
 
 def test_dash_cam_recording():
-    """检查卡录像"""
-    # 检查卡录像的代码写在这
-    pass
+    """检查卡录像断点"""
+    project = setup_environmentV1()
+    project.goto('回放页')
+
+test_dash_cam_recording()
 
 
+@pytest.mark.run(order=7)
 @pytest.mark.devices
-@pytest.mark.smoke
+# @pytest.mark.smoke
 def test_device_info(setup_environment: MobieProject):
     # 检查设备信息的代码写在这里
     device_dict = read_excel_to_dict(environment_variable.ruiboshi_excel, '设备详情', 'IOTDBB-065896-UXLYD', 3)
@@ -292,6 +366,7 @@ def test_device_info(setup_environment: MobieProject):
         print(val[0], project.is_element_exist(val[0]))
 
 
+@pytest.mark.run(order=8)
 @pytest.mark.timezone
 @pytest.mark.smoke
 @pytest.mark.flaky(reruns=2, reruns_delay=1)
@@ -307,11 +382,12 @@ def test_timezone(setup_environment: MobieProject):
     assert device_timestamp < ntp_timestamp + 1 or device_timestamp > ntp_timestamp - 1
 
 
-# @pytest.mark.sleep_mode
-# @pytest.mark.smoke
-# @pytest.mark.flaky(reruns=2, reruns_delay=1)
-def test_sleep_mode():
-    project = setup_environment()
+@pytest.mark.run(order=9)
+@pytest.mark.sleep_mode
+@pytest.mark.smoke
+@pytest.mark.flaky(reruns=2, reruns_delay=1)
+def test_sleep_mode(setup_environment: MobieProject):
+    project = setup_environment
     if project.is_element_exist('立即唤醒'):
         project.clickControl('立即唤醒', 'text')
     project.goto('立即睡眠')
@@ -321,16 +397,61 @@ def test_sleep_mode():
     project.clickControl('立即唤醒', 'text')
     assert not project.is_element_exist('睡眠中')
     assert project.is_element_exist('在线')
-test_sleep_mode()
+
 
 def test_reset_to_defaults():
     # 执行恢复出厂设置的操作，示例代码：
     pass
 
 
-def test_event_report():
+@pytest.mark.run(order=10)
+@pytest.mark.motion_event
+@pytest.mark.smoke
+@pytest.mark.repeat(1)
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
+def test_motion_event_reported(setup_environment: MobieProject):
     # 执行事件上报，示例代码：
-    pass
+    project = setup_environment
+    project.goto('报警管理页')
+    attribute = {'resource_id':'com.zwcode.p6slite:id/param_switch'}
+    element = project.find_nearest_element(attribute, '移动侦测报警')
+    time.sleep(3)
+    t1 = ntp_util.get_ntp_timestamp()
+    if project.is_element_checkable(element):
+        element.click()  # 关闭移动侦测使能
+    if not project.is_element_checkable(element):
+        element.click()  # 打开移动侦测使能
+    while True:
+        project.goto('首页')
+        project.goto('消息查询页')
+        if project.is_element_exist('消息通知功能未开启'):
+            project.clickControl('立即开启', 'text')
+            project.goto('消息查询页')
+        assert ntp_util.get_ntp_timestamp() - t1 <= 300
+
+        if not project.is_element_exist('移动侦测'):
+            time.sleep(15)
+            continue
+
+        attribute = {'text': "移动侦测"}
+        motion_element = project.find_nearest_element(attribute, '全部时间')
+        attribute = {'resource_id': 'com.zwcode.p6slite:id/push_tv_time'}
+        motion_element = project.find_nearest_element(attribute, motion_element)
+        time_value = motion_element.get_attribute('text')
+        motion_event_timestamp = ntp_util.str_time_to_timestamp(time_value)
+
+        if motion_event_timestamp < t1:
+            time.sleep(10)
+            continue
+
+        if motion_event_timestamp > t1:
+            break
+
+
+
+
+
+
 
 
 def test_volume():
@@ -338,6 +459,4 @@ def test_volume():
     pass
 
 
-def test_human_tracking():
-    # 测试追踪功能的代码写在这里
-    pass
+

@@ -2,8 +2,9 @@
 import os
 import re
 from appium.webdriver.common.touch_action import TouchAction
-from selenium.webdriver.remote.webelement import WebElement
 from appium import webdriver
+from selenium.webdriver.common.by import By
+
 from adjacency_list import LinkedGraph
 from my_decorator import retry
 from data_store import toDictV5
@@ -15,6 +16,7 @@ from openpyxl.utils import get_column_letter
 from xrs_log import print
 import locale
 import traceback
+from appium.webdriver.common.mobileby import MobileBy
 
 locale.setlocale(locale.LC_CTYPE, 'chinese')
 
@@ -69,6 +71,7 @@ class MobieProject:
         desired_caps.update(self.app.app_pack_d[app])  # 加载手机app包名和active
         return desired_caps
 
+
     @retry(retries=2, delay=8)  # 当前执行返回未找到元素时，等待一段时间后再次执行
     def clickControl(self, control, mode):
         # 按钮控件
@@ -84,7 +87,7 @@ class MobieProject:
             self.driver.tap(control, 300)
         time.sleep(WAITTIME)
 
-    @retry(retries=2, delay=8)  # 当前执行返回未找到元素时，等待一段时间后再次执行
+    @retry(retries=3, delay=8)  # 当前执行返回未找到元素时，等待一段时间后再次执行
     def clickControlV1(self, element, content=None):
         '''
         实现页面跳转，为goto方法提供基础方法
@@ -270,12 +273,6 @@ class MobieProject:
             min_empty_row = 2
             while worksheet[f'A{min_empty_row}'].value:
                 min_empty_row += 1
-            # # 定位元素并获取数据
-            # if attribute == 'resource_id':
-            #     element = self.driver.find_element_by_id(value)
-            # elif attribute == 'text':
-            #     element = self.driver.find_element_by_android_uiautomator(
-            #         f'new UiSelector().text("{value}")')
             element_dict = {
                 '顶点': vertex_name,
                 '邻近点': None,
@@ -286,13 +283,6 @@ class MobieProject:
                 'default_val': None,
                 'weight': 1
             }
-            # 表头存储到excel
-            # row_num = 1
-            # for idx, key in enumerate(element_dict, start=1):
-            #     col_letter = get_column_letter(idx)
-            #     print(col_letter, row_num)
-            #     worksheet[f'{col_letter}{row_num}'] = key
-            # 存储元素数据到工作表中
             for idx, key in enumerate(element_dict, start=1):
                 col_letter = get_column_letter(idx)
                 # print(col_letter,min_empty_row)
@@ -322,6 +312,64 @@ class MobieProject:
         action = TouchAction(self.driver)
         action.long_press(element).wait(duration).release().perform()
 
+    def find_nearest_element(self, attribute: dict, text_value):
+        """通过resource_id定位多个元素，找到距离文本为text_value的元素最近的一个"""
+        if 'resource_id' in attribute.keys():
+            # 找到所有具有给定 resource-id 的元素
+            elements = self.driver.find_elements_by_id(attribute['resource_id'])
+        elif 'text' in attribute.keys():
+            attribute_text = attribute['text']
+            elements = self.driver.find_elements_by_android_uiautomator(
+                f'new UiSelector().text("{attribute_text}")')
+
+        # 获取参考元素的坐标
+        if type(text_value) == type('string'):
+            reference_element = self.driver.find_element_by_android_uiautomator(
+                f'new UiSelector().text("{text_value}")')
+        else:
+            reference_element = text_value
+        ref_location = reference_element.location
+
+        # 计算其他元素的中心坐标并选择最接近参考元素的元素
+        nearest_element, nearest_distance = None, float('inf')
+        for element in elements:
+            element_location = element.location
+            element_size = element.size
+            element_center = (element_location['x'] + element_size['width'] / 2,
+                              element_location['y'] + element_size['height'] / 2)
+            distance = ((element_center[0] - ref_location['x']) ** 2 +
+                        (element_center[1] - ref_location['y']) ** 2) ** 0.5
+            # print(element,element_center,distance,ref_location)
+            if distance < nearest_distance:
+                nearest_element, nearest_distance = element, distance
+
+        return nearest_element
+
+    def is_element_checkable(self, element):
+        """判断元素是否勾选，true表示已勾选"""
+        checkable_attr = element.get_attribute('checked')
+        return checkable_attr == 'true'
+
+    def pinch_zoom(self, start, end, scale_factor=1.25, duration=500):
+        action = TouchAction(self.driver)
+
+        # 计算中心点
+        start_x, start_y = start
+        end_x, end_y = end
+        mid_x = (start_x + end_x) // 2
+        mid_y = (start_y + end_y) // 2
+
+        # 第一根手指按下屏幕
+        action.press(x=start_x, y=start_y)
+
+        # 第二根手指按下屏幕并滑动到位置
+        x1 = int(end_x + (end_x - mid_x) * (scale_factor - 1) / 2)
+        y1 = int(end_y + (end_y - mid_y) * (scale_factor - 1) / 2)
+        action.move_to(x=x1, y=y1).wait(duration)
+
+        # 两根手指同时离开屏幕
+        action.move_to(x=mid_x, y=mid_y).release()
+        action.perform()
 
 class App:
     # app包名
@@ -354,7 +402,16 @@ if __name__ == "__main__":
         if not type:type= 'button'
         ruiboshi.get_element_data(attribute, value, excel_file_path,vertex_name,type)
     '''
-    project = MobieProject('和家亲')
-    while True:
-        project.pwd()
-        time.sleep(5)
+    # 打印当前位置
+    # project = MobieProject('和家亲')
+    # while True:
+    #     project.pwd()
+    #     time.sleep(5)
+    # ruiboshi = MobieProject('睿博士')
+    # ruiboshi.goto('报警管理页')
+    # element = ruiboshi.find_nearest_element('com.zwcode.p6slite:id/param_switch', '移动侦测报警')
+    # print(ruiboshi.is_element_checkable(element))
+    ruiboshi = MobieProject('睿博士')
+    ruiboshi.goto('回放页')
+    time.sleep(10)
+    ruiboshi.pinch_zoom((200,1065),(800,1065))

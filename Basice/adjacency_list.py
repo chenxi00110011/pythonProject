@@ -274,4 +274,4 @@ if __name__ == "__main__":
     #                 print(frist.pageName, end.pageName)
     #                 print(g.dfs(frist.pageName, end.pageName))
     #                 print("-------------------------------")
-    print(g.get_road_sign('设置页', '首页'))
+    print(g.get_road_sign('报警管理页', '消息查询页'))

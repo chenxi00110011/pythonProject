@@ -18,17 +18,21 @@ def get_ntp_time(ntp_server):
         return None
 
 
-def get_ntp_timestamp(ntp_server="pool.ntp.org"):
+def get_ntp_timestamp(ntp_server="pool.ntp.org", int_val=None):
     """
     获取NTP服务器的当前时间，返回格式为时间戳
 
+    :param int_val: 标记结果是否取整
     :param ntp_server: NTP服务器地址
     :return: 当前时间（时间戳形式）
     """
     ntp_time = get_ntp_time(ntp_server)
     for i in range(3):
         if ntp_time:
-            return int(ntp_time)
+            if int_val is None:
+                return int(ntp_time)
+            else:
+                return ntp_time
         else:
             time.sleep(3)
             ntp_time = get_ntp_time(ntp_server)
@@ -62,9 +66,5 @@ def str_time_to_timestamp(time_str, format="%Y-%m-%d %H:%M:%S"):
 
 
 if __name__ == "__main__":
-    ntp_server = "pool.ntp.org"
-    ntp_str_time = get_ntp_timestamp(ntp_server)
-    if ntp_str_time:
-        print("Network Time: ", ntp_str_time)
-    else:
-        print("Failed to get Network Time!")
+
+    print(str_time_to_timestamp('2023-06-09 15:11:59'),len('2023-06-09 15:11:59'))
