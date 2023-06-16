@@ -10,7 +10,7 @@ import environment_variable as env
 command_dict = {
     '点亮屏幕': 'adb shell input keyevent 224',
     '下载睿博士录像': f'adb pull {env.p6slite_videos} {env.adb_download}',
-    '清空睿博士录像': f"adb shell rm {env.p6slite_videos}*mp4 ",
+    '清空睿博士录像': f"adb shell rm {env.p6slite_videos}* ",
     '下载相册': f'adb pull {env.photo_album} {env.adb_download}',
     '获取安卓版本': 'adb shell getprop ro.build.version.release',
     '获取手机分辨率': 'adb shell wm size',
@@ -18,7 +18,8 @@ command_dict = {
     '密码解锁': 'adb shell input text password',
     '下载睿博士截图': f'adb pull {env.ruibo_screenshot_path} {env.adb_download}',
     '清空睿博士截图': f'adb shell rm {env.ruibo_screenshot_path}*',
-    '下载手机截屏': f'adb pull {env.mobile_screen_capture} {env.adb_download}',
+    '下载手机截屏': f'adb pull {env.mobile_screen_capture}screenshot.png {env.screenshot_path}',
+    '手机截屏': f'adb shell screencap -p {env.mobile_screen_capture}screenshot.png'
 
 }
 
@@ -149,6 +150,8 @@ def pinch_zoom(start, end, scale_factor=2.0, press_duration=500):
 if __name__ == "__main__":
     # 重启app
     # start_app('com.zwcode.p6slite', '.activity.SplashActivity')
+    # os.system(command_dict['手机截屏'])
     # os.system(command_dict['下载手机截屏'])
     # pinch_zoom((400,1065),(600,1065))
-    print(get_screen_resolution())
+    # print(get_screen_resolution())
+    os.system(command_dict['下载睿博士录像'])

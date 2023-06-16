@@ -3,9 +3,12 @@ import os
 import re
 from appium.webdriver.common.touch_action import TouchAction
 from appium import webdriver
-from selenium.webdriver.common.by import By
 
+import environment_variable
+import image_properties
+import ntp_util
 from adjacency_list import LinkedGraph
+from image_properties import recognize_text
 from my_decorator import retry
 from data_store import toDictV5
 from environment_variable import ruiboshi_excel, cmri_excel_element_dict
@@ -16,7 +19,6 @@ from openpyxl.utils import get_column_letter
 from xrs_log import print
 import locale
 import traceback
-from appium.webdriver.common.mobileby import MobileBy
 
 locale.setlocale(locale.LC_CTYPE, 'chinese')
 
@@ -34,6 +36,45 @@ desired_caps = {
     'automationName': 'UiAutomator2'
 }
 WAITTIME = 2
+
+
+def get_element_data(element, excel_file_path, vertex_name):
+    """
+       获取App页面元素数据，并将其存储在Excel文件中
+       :param vertex_name:
+       :param element:
+       :param driver: WebDriver对象
+       :param locator: 元素定位表达式，例如(By.ID, 'username')
+       :param excel_file_path: Excel文件路径
+    """
+    try:
+        # 打开Excel工作簿
+        workbook = openpyxl.load_workbook(excel_file_path)
+        worksheet = workbook['page']
+        # 检索最小的空行号
+        min_empty_row = 2
+        while worksheet[f'A{min_empty_row}'].value:
+            min_empty_row += 1
+        element_dict = {
+            '顶点': vertex_name,
+            '邻近点': None,
+            'resource_id': element.get_attribute('resource-id'),
+            'bounds': element.get_attribute('bounds'),
+            'text': element.text,
+            'type': None,
+            'default_val': None,
+            'weight': 1
+        }
+        for idx, key in enumerate(element_dict, start=1):
+            col_letter = get_column_letter(idx)
+            # print(col_letter,min_empty_row)
+            worksheet[f'{col_letter}{min_empty_row}'] = element_dict[key]
+        # 保存工作簿
+        workbook.save(excel_file_path)
+
+    except Exception as e:
+        traceback.print_exc()
+        print(e)
 
 
 class MobieProject:
@@ -70,7 +111,6 @@ class MobieProject:
         desired_caps['platformVersion'] = xrs_adb.popen('获取安卓版本')  # 更新手机安卓版本
         desired_caps.update(self.app.app_pack_d[app])  # 加载手机app包名和active
         return desired_caps
-
 
     @retry(retries=2, delay=8)  # 当前执行返回未找到元素时，等待一段时间后再次执行
     def clickControl(self, control, mode):
@@ -121,7 +161,10 @@ class MobieProject:
                         f'new UiSelector().text("{element[attribute]}")'
                     ).send_keys(content)
                 break
-        time.sleep(WAITTIME)
+        if element['wait']:
+            time.sleep(element['wait'])
+        else:
+            time.sleep(WAITTIME)
 
     def boundsToCoordinates(self, bounds):
         # 将坐标字符串，转为坐标点。例如[945,123][1035,213]，变为[(x,y)]格式
@@ -139,7 +182,7 @@ class MobieProject:
         y = int((int(result[2]) + int(result[4])) * (physical_size[1] * deviation_value_y / 2340) / 2)
         return [(x, y)]
 
-    # @retry(retries=2, delay=4)  # 当前执行返回未找到元素时，等待一段时间后再次执行
+    @retry(retries=2, delay=10)  # 当前执行返回未找到元素时，等待一段时间后再次执行
     def goto(self, *args):
         # 实现页面跳转，依赖于LinkedGraph类的寻路方法get_road_sign，依赖clickControlV1方法
         currentPageName = self.pwd()  # 执行goto前，先找到当前页面名称
@@ -258,42 +301,6 @@ class MobieProject:
                     new = self.driver.page_source
         return found
 
-    def get_element_data(self, element, excel_file_path, vertex_name):
-        """
-           获取App页面元素数据，并将其存储在Excel文件中
-           :param driver: WebDriver对象
-           :param locator: 元素定位表达式，例如(By.ID, 'username')
-           :param excel_file_path: Excel文件路径
-        """
-        try:
-            # 打开Excel工作簿
-            workbook = openpyxl.load_workbook(excel_file_path)
-            worksheet = workbook['page']
-            # 检索最小的空行号
-            min_empty_row = 2
-            while worksheet[f'A{min_empty_row}'].value:
-                min_empty_row += 1
-            element_dict = {
-                '顶点': vertex_name,
-                '邻近点': None,
-                'resource_id': element.get_attribute('resource-id'),
-                'bounds': element.get_attribute('bounds'),
-                'text': element.text,
-                'type': None,
-                'default_val': None,
-                'weight': 1
-            }
-            for idx, key in enumerate(element_dict, start=1):
-                col_letter = get_column_letter(idx)
-                # print(col_letter,min_empty_row)
-                worksheet[f'{col_letter}{min_empty_row}'] = element_dict[key]
-            # 保存工作簿
-            workbook.save(excel_file_path)
-
-        except Exception as e:
-            traceback.print_exc()
-            print(e)
-
     def long_press_element_by_uiautomator(self, selector, duration=2000):
         """
         在 Appium 中封装长按元素方法。
@@ -371,6 +378,59 @@ class MobieProject:
         action.move_to(x=mid_x, y=mid_y).release()
         action.perform()
 
+    def check_sdcard_recording_breakpoint(self, time_slot):
+        """睿博士卡录像断点判断"""
+        # 判断是否在回放页
+        if self.pwd() != '回放页':
+            raise Exception('当前页面不是回放页')
+        os.system(xrs_adb.command_dict['手机截屏'])
+        os.system(xrs_adb.command_dict['下载手机截屏'])
+
+        # 截图，将回放进度条图片转变为时间字符串
+        text_coords = recognize_text('C:\\Users\\Administrator\\Desktop\\video\\Screenshots\\screenshot.png',
+                                     (0.44, 0.52, 0, 1))
+        print(text_coords.keys())
+        time_list = text_coords.keys()
+
+        # 过滤非法时间，并返回时间区间
+        time_list = [time for time in time_list if re.match(r'^([01][0-9]|2[0-3]):[0-5][0-9]$', time)]
+        time_range = (time_list[0], time_list[-1])
+
+        # 获取屏幕分辨率，找到进度条的Y轴值
+        screen_resolution = xrs_adb.get_screen_resolution()
+        ruleview_y = screen_resolution[1] * 0.48
+
+        # 判断需要检查的时间区间是否在页面中，不在则对应左移或者右移
+        if ntp_util.compare_time(time_slot[0], time_range[0]):
+            touch = TouchAction(self.driver)
+            touch.press(x=100, y=ruleview_y).wait(1000).move_to(x=540, y=ruleview_y).release().perform()
+            return self.check_sdcard_recording_breakpoint(time_slot)
+        elif not ntp_util.compare_time(time_slot[0], time_range[1]):
+            touch = TouchAction(self.driver)
+            touch.press(x=900, y=ruleview_y).move_to(x=540, y=ruleview_y).release().perform()
+            return self.check_sdcard_recording_breakpoint(time_slot)
+
+        # 将时间换算为坐标X值，然后获取该区间内的所有像素的RGB值
+        print('找到对应的区间')
+        first_coordinate = (text_coords[time_range[0]][0], text_coords[time_range[1]][0])
+        print(time_range, time_slot, first_coordinate)
+        second_coordinate = ntp_util.get_coordinates(time_range, time_slot, first_coordinate)
+        pixel_info = dict()
+        for x in range(second_coordinate[0], second_coordinate[1], 1):
+            pixel_info[(x, 80)] = image_properties.get_pixel_color('cropped.jpg', (x, 80))
+        # print(pixel_info)
+
+        # 遍历该RGB值的字典，判断是否有断点
+        result = []
+        for pixel, rgb in pixel_info.items():
+            if sum(rgb) < 10:
+                result.append(pixel)
+        if result:
+            return False
+        else:
+            return True
+
+
 class App:
     # app包名
     app_pack_d = {
@@ -387,21 +447,7 @@ if __name__ == "__main__":
     # # print(a.appIsRunning('com.zwcode.p6slite'))
     # print(a.get_deviceid() == [])
     # # # print(a.appIsRunning("adb shell 'dumpsys window | grep mCurrentFocus'"))
-    '''
-    excel_file_path = excel_element_dict
-    ruiboshi = MobieProject('睿博士')
-    _vertex_name = vertex_name = '首页'
-    while True:
-        _vertex_name = input(f"请输入页面名称（默认{_vertex_name}）：\t")
-        if _vertex_name:vertex_name = _vertex_name
-        attribute = input("请输入属性类型，例如text/resource_id：\t")
-        if not attribute:continue
-        value = input("请输入属性值：\t")
-        if not value: continue
-        type = input("请输入控件类型button/input_box：\t")
-        if not type:type= 'button'
-        ruiboshi.get_element_data(attribute, value, excel_file_path,vertex_name,type)
-    '''
+
     # 打印当前位置
     # project = MobieProject('和家亲')
     # while True:
@@ -411,7 +457,17 @@ if __name__ == "__main__":
     # ruiboshi.goto('报警管理页')
     # element = ruiboshi.find_nearest_element('com.zwcode.p6slite:id/param_switch', '移动侦测报警')
     # print(ruiboshi.is_element_checkable(element))
+    #############################################################################
+    # ruiboshi = MobieProject('睿博士')
+    # ruiboshi.goto('回放页')
+    # time.sleep(10)
+    # ruiboshi.pinch_zoom((200,1065),(800,1065))
+    # """检查SD卡回放条"""
+    # ruiboshi = MobieProject('睿博士')
+    # ruiboshi.goto('回放页')
+    # time.sleep(10)
+    # print(ruiboshi.check_sdcard_recording_breakpoint(('11:00', '12:00')))
+    """"""
     ruiboshi = MobieProject('睿博士')
-    ruiboshi.goto('回放页')
-    time.sleep(10)
-    ruiboshi.pinch_zoom((200,1065),(800,1065))
+    ruiboshi.goto('录像列表页')
+    ruiboshi.goto('首页')

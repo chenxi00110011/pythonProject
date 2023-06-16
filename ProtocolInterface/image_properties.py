@@ -110,31 +110,6 @@ def video_to_frames0(video_path, output_path):
     cv2.destroyAllWindows()
 
 
-def video_to_frames(input_video, output_folder):
-    # 如果文件夹存在，则清空文件夹；否则创建一个新的空文件夹
-    if os.path.exists(output_path):
-        shutil.rmtree(output_path)  # 递归删除文件夹中的所有文件
-    os.mkdir(output_path)  # 创建一个新的空文件夹
-
-    # 确认输入文件是一个存在并完整的视频文件
-    if not os.path.isfile(input_video):
-        raise FileNotFoundError("输入文件 {} 不存在".format(input_video))
-    if not cv2.haveImageReader(input_video):
-        raise ValueError("输入文件不是一个完整的视频文件")
-
-    # 提取视频帧
-    cap = cv2.VideoCapture(input_video)
-    count = 0
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        cv2.imwrite(os.path.join(output_folder, '{:06d}.jpg'.format(count)), frame)
-        count += 1
-
-    cap.release()
-
-
 def extract_frames(video_path, output_dir, fps=1):
     """
     将输入的视频文件转换为单独的图像文件
@@ -161,11 +136,12 @@ def image_timestamp(filePath):
     return result
 
 
-def image_ruleview(filePath):
-    result = {}
-    for fileName in os.listdir(filePath):
-        url = filePath + fileName
-        text_list = recognize_text(url, (0.44, 0.52, 0, 1)).keys()
+def color_check(startPoint, endPoint, precision=10):
+    """判断SD回放进度条颜色，返回字典"""
+    pixel_info = dict()
+    for x in range(startPoint, endPoint, precision):
+        pixel_info[(x, 80)] = get_pixel_color('cropped.jpg', (x, 80))
+    return pixel_info
 
 
 def get_pixel_color(image_path, position):
