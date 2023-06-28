@@ -7,9 +7,10 @@ from collections import deque, defaultdict
 
 
 class Page:
-    def __init__(self, name, excel_path=ruiboshi_excel):
+    def __init__(self, name, excel_path=ruiboshi_excel, sheet='page_element'):
         # 初始化时，将excel中每页对应的元素上传到self.neighbor
         self.excel_path = excel_path
+        self.sheet = sheet
         self.pageName = name
         self.neighbor = self.__get_adjacency_list()
 
@@ -20,7 +21,7 @@ class Page:
             self.neighbor[neighbor].append(list_elem)
 
     def __get_adjacency_list(self):  # 将self.excel_path文件中的页面跳转元素上传到类中
-        return toDictV2(self.excel_path, self.pageName)
+        return toDictV2(self.excel_path, self.pageName, self.sheet)
 
     def __str__(self):  # 将self.pageName设置为类的打印
         return self.pageName
@@ -30,8 +31,8 @@ class Page:
 
 
 class Vertex(Page):
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, sheet):
+        super().__init__(name,sheet=sheet)
         self.firstEdge = None
 
 
@@ -43,7 +44,7 @@ class Edge(object):
 
 class LinkedGraph(object):
     # 实现输入图的顶点和边，能够得到邻接表
-    def __init__(self, excel_path=ruiboshi_excel):
+    def __init__(self, excel_path=ruiboshi_excel, sheet='page_element'):
         # 存储节点信息的excel文件的绝对路径
         self.excel_path = excel_path
         # 图的顶点
@@ -57,7 +58,7 @@ class LinkedGraph(object):
         # 存放顶点的列表
         self.listVex = [Vertex for i in range(self.vexLen)]
         for i in range(self.vexLen):
-            self.listVex[i] = Vertex(self.vers[i])
+            self.listVex[i] = Vertex(self.vers[i], sheet=sheet)
         # 表示图的表
         for edge in self.edges:
             # print(edge)
@@ -95,7 +96,8 @@ class LinkedGraph(object):
             p = p.next
         p.next = edge
 
-    def __get_pageName(self):  # 将self.excel_path文件中的页面名称上传到类中
+    # 读取self.excel_path文件的顶点
+    def __get_pageName(self):
         return toDictV3(self.excel_path)
 
     def __get_edges(self):  # 将self.excel_path文件中的页面名称上传到类中
@@ -256,7 +258,7 @@ class LinkedGraph(object):
         keyList = list(all_road.keys())
         shortest_road = all_road[keyList[shortest_idx]]
         road = [initial] + shortest_road
-
+        # print(road)
         result = []
         for c1, c2 in zip(road[:-1], road[1:]):
             for vertex in self.listVex:
@@ -274,4 +276,4 @@ if __name__ == "__main__":
     #                 print(frist.pageName, end.pageName)
     #                 print(g.dfs(frist.pageName, end.pageName))
     #                 print("-------------------------------")
-    print(g.get_road_sign('报警管理页', '消息查询页'))
+    print(g.get_road_sign('录像存储设置页', '设置页'))

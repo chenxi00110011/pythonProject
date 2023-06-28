@@ -3,13 +3,12 @@ import os
 import re
 from appium.webdriver.common.touch_action import TouchAction
 from appium import webdriver
-
 import environment_variable
 import image_properties
 import ntp_util
 from adjacency_list import LinkedGraph
 from image_properties import recognize_text
-from my_decorator import retry
+from my_decorator import retry, timer
 from data_store import toDictV5
 from environment_variable import ruiboshi_excel, cmri_excel_element_dict
 import time
@@ -21,6 +20,10 @@ import locale
 import traceback
 
 locale.setlocale(locale.LC_CTYPE, 'chinese')
+
+'''
+1、建议改为显式等待和隐式等待
+'''
 
 # 初始化参数
 desired_caps = {
@@ -38,9 +41,10 @@ desired_caps = {
 WAITTIME = 2
 
 
-def get_element_data(element, excel_file_path, vertex_name):
+def get_element_data(element, excel_file_path, vertex_name, sheetName='page_element'):
     """
        获取App页面元素数据，并将其存储在Excel文件中
+       :param sheetName:
        :param vertex_name:
        :param element:
        :param driver: WebDriver对象
@@ -50,7 +54,7 @@ def get_element_data(element, excel_file_path, vertex_name):
     try:
         # 打开Excel工作簿
         workbook = openpyxl.load_workbook(excel_file_path)
-        worksheet = workbook['page']
+        worksheet = workbook[sheetName]
         # 检索最小的空行号
         min_empty_row = 2
         while worksheet[f'A{min_empty_row}'].value:
@@ -63,7 +67,8 @@ def get_element_data(element, excel_file_path, vertex_name):
             'text': element.text,
             'type': None,
             'default_val': None,
-            'weight': 1
+            'weight': 1,
+            'wait': None
         }
         for idx, key in enumerate(element_dict, start=1):
             col_letter = get_column_letter(idx)
@@ -99,12 +104,14 @@ class MobieProject:
         self.driver = webdriver.Remote('http://localhost:4723/wd/hub', self.desired_caps)  # 启动appuim客户端
         time.sleep(10)  # 等待app启动
         self.mobile_phone = None
-        self.LinkedGraph = LinkedGraph()  # 创建邻接表
         if app_name == '睿博士':
-            self.allElemDict = toDictV5(ruiboshi_excel)  # 缓存pwd的页面元素
+            self.LinkedGraph = LinkedGraph()  # 创建邻接表
+            self.allElemDict = toDictV5(ruiboshi_excel, sheetName='page_element')  # 缓存pwd的页面元素
         elif app_name == '和家亲':
-            self.allElemDict = toDictV5(cmri_excel_element_dict)  # 缓存pwd的页面元素
-        time.sleep(WAITTIME)
+            self.LinkedGraph = LinkedGraph(sheet='universalapp')  # 创建邻接表
+            self.allElemDict = toDictV5(ruiboshi_excel, sheetName='universalapp')  # 缓存pwd的页面元素
+        # 初始化隐形等待时间
+        self.driver.implicitly_wait(10)
 
     def __returnAppPackName(self, app, desired_caps):
         # 为__init__方法提供self.desired_caps属性
@@ -113,7 +120,7 @@ class MobieProject:
         return desired_caps
 
     @retry(retries=2, delay=8)  # 当前执行返回未找到元素时，等待一段时间后再次执行
-    def clickControl(self, control, mode):
+    def clickControl(self, control, mode, wait=None):
         # 按钮控件
         if control is None:
             raise Exception("输入None")
@@ -125,9 +132,12 @@ class MobieProject:
             self.driver.find_element_by_id(control).click()
         elif mode == 'bounds':
             self.driver.tap(control, 300)
-        time.sleep(WAITTIME)
+        if wait:
+            print(f"等待{wait}秒")
+            time.sleep(wait)
 
     @retry(retries=3, delay=8)  # 当前执行返回未找到元素时，等待一段时间后再次执行
+    @timer
     def clickControlV1(self, element, content=None):
         '''
         实现页面跳转，为goto方法提供基础方法
@@ -135,7 +145,7 @@ class MobieProject:
         :param content: 输入框类型，输入的内容
         :return: 无
         '''
-        print(f"当前处于\t{element}")  # 打印当前正在跳转的页面元素
+        print(f"即将跳转至：\t{element}")  # 打印当前正在跳转的页面元素
         if element['type'] == 'button':  # 按钮类型控件
             for attribute in ['text', 'resource_id', 'bounds']:  # 遍历元素的属性值，判断是否为None，然后执行
                 if element[attribute] is None:
@@ -149,6 +159,9 @@ class MobieProject:
                     self.driver.tap(self.boundsToCoordinates(element[attribute]), 300)
                 break
         elif element['type'] == 'input_box':  # 输入框类型控件
+            # # 输入框类型，需要强制等待2s
+            # print(f'执行输入')
+            # time.sleep(2)
             if content is None:  # 判断content是否为空，否则使用excel中默认值
                 content = element['default_val']
             for attribute in ['resource_id', 'text']:
@@ -162,9 +175,8 @@ class MobieProject:
                     ).send_keys(content)
                 break
         if element['wait']:
+            print(f"等待{element['wait']}秒")
             time.sleep(element['wait'])
-        else:
-            time.sleep(WAITTIME)
 
     def boundsToCoordinates(self, bounds):
         # 将坐标字符串，转为坐标点。例如[945,123][1035,213]，变为[(x,y)]格式
@@ -183,8 +195,9 @@ class MobieProject:
         return [(x, y)]
 
     @retry(retries=2, delay=10)  # 当前执行返回未找到元素时，等待一段时间后再次执行
-    def goto(self, *args):
+    def goto(self, *args) -> object:
         # 实现页面跳转，依赖于LinkedGraph类的寻路方法get_road_sign，依赖clickControlV1方法
+        # print('开始执行goto')
         currentPageName = self.pwd()  # 执行goto前，先找到当前页面名称
         initial, destination = currentPageName, args[0]
         if initial == destination:  # 判断起始点与终点是否相同，相同则返回
@@ -199,6 +212,7 @@ class MobieProject:
             else:
                 content = None
             self.clickControlV1(emel, content)
+        # print('结束执行goto')
 
     @retry(retries=2, delay=8)  # 当前执行返回未找到元素时，等待一段时间后再次执行
     def enterTo(self, control, content, mode):
@@ -213,16 +227,19 @@ class MobieProject:
             self.driver.find_element_by_id(control).send_keys(content)
         # elif mode == 'bounds':
         #     self.driver.tap(control, 300)
-        time.sleep(WAITTIME)
 
     def is_element_exist(self, element, times=3, wait=0, page_source=None):
-        # 验证页面是否存在某个元素，用于判断页面是否跳转成功
+        """验证页面是否存在某个元素，用于判断页面是否跳转成功"""
+        # 判断输入是否为int类型，是则转变为str类型
+        if isinstance(element, int):
+            element = str(element)
         count = 0
         while count < times:
             if page_source is None:
                 souce = self.driver.page_source
             else:
                 souce = page_source
+            # print(element)
             if re.search(element, souce):  # 通过正则表示判断
                 return True
             # if element in souce:
@@ -232,20 +249,18 @@ class MobieProject:
                 time.sleep(wait)
         return False
 
+    @timer
     def pwd(self):
-        '''
-        找到app当前页面
-        :return: 当前页面名称
-        '''
+        """找到当前所处页面"""
         page_source = self.driver.page_source  # 将is_element_exist方法需要用的页面元素提前缓存，优化运行效率
         if not xrs_adb.is_foreground(self.desired_caps['appPackage']):  # 判断app是否前台运行
-            return '未检测到指定app'
+            raise Exception('未检测到指定app')
         allElemDict = self.allElemDict  # 将pwd方法需要用的页面元素提前缓存，优化运行效率
         degreeOfRealism = dict()
         for pageName, elemList in allElemDict.items():
             degreeOfRealism[pageName] = 0
             for elem in elemList:
-                # print(elem)
+                # print(elem)   # 出现有的元素通过不了正则表达式
                 for attribute in ['text', 'resource_id']:
                     if elem[attribute] is None:
                         continue
@@ -253,28 +268,13 @@ class MobieProject:
                     elif self.is_element_exist(elem[attribute], times=1, page_source=page_source):
                         degreeOfRealism[pageName] += elem['weight']  # 加权
         for pageName, score in degreeOfRealism.items():  # 通过分数判断当前页面
+            # print(pageName,':', score)  # 打印页面评分
             if score == max(degreeOfRealism.values()):
-                print(pageName)
+                print(f'当前页面为<{pageName}>')
                 return pageName
 
-    def hjq_update_device_adjacency_list(self):
-        '''
-        # 实现更新邻接表中和家亲设备列中的设备
-        步骤：
-        1、到设备列表，获取所有设备的resource-id、text、bounds
-        2、添加到邻接表中
-        3、加载邻接表
-        :return:
-        '''
-        elemList = self.driver.find_elements_by_id('com.cmri.universalapp:id/sm_device_name_tv')
-        return elemList
-
-    def __find_element(self, element):
-        '''
-        滑动屏幕，找元素，找到返回True
-        :param element:需要查找的元素
-        :return:
-        '''
+    def scroll_to_element(self, element):
+        """滑动屏幕找到元素element"""
         size = self.driver.get_window_size()
         # 当我第一次进入页面的时候：
         found = False
@@ -291,9 +291,7 @@ class MobieProject:
                     found = True
                 else:
                     # 找不到元素的时候，滑动，此时页面更新
-                    self.driver.swipe(size['width'] * 0.5, size['height'] * 0.4, size['width'] * 0.5,
-                                      size['height'] * 0.,
-                                      200)
+                    self.driver.swipe(size['width'] * 0.5, size['height'] * 0.8, size['width'] * 0.5, size['height'] * 0.2, 200)
                     time.sleep(2)
                     # 更新old 的值。用new 的值更新old 的值
                     old = new
@@ -420,6 +418,10 @@ class MobieProject:
             pixel_info[(x, 80)] = image_properties.get_pixel_color('cropped.jpg', (x, 80))
         # print(pixel_info)
 
+        # 将区间拖到中心，播放该区间的卡录像
+        touch = TouchAction(self.driver)
+        touch.press(x=second_coordinate[0], y=ruleview_y).wait(1000).move_to(x=540, y=ruleview_y).release().perform()
+
         # 遍历该RGB值的字典，判断是否有断点
         result = []
         for pixel, rgb in pixel_info.items():
@@ -468,6 +470,6 @@ if __name__ == "__main__":
     # time.sleep(10)
     # print(ruiboshi.check_sdcard_recording_breakpoint(('11:00', '12:00')))
     """"""
-    ruiboshi = MobieProject('睿博士')
-    ruiboshi.goto('录像列表页')
-    ruiboshi.goto('首页')
+    project = MobieProject('睿博士')
+    project.goto('手动添加页')
+    project.goto('首页', 'IOTDBB-065896-UXLYD', 'test_dev')

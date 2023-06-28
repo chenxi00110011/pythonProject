@@ -19,7 +19,8 @@ command_dict = {
     '下载睿博士截图': f'adb pull {env.ruibo_screenshot_path} {env.adb_download}',
     '清空睿博士截图': f'adb shell rm {env.ruibo_screenshot_path}*',
     '下载手机截屏': f'adb pull {env.mobile_screen_capture}screenshot.png {env.screenshot_path}',
-    '手机截屏': f'adb shell screencap -p {env.mobile_screen_capture}screenshot.png'
+    '手机截屏': f'adb shell screencap -p {env.mobile_screen_capture}screenshot.png',
+    '打开直播隐藏菜单': 'adb shell input tap 500 500'
 
 }
 

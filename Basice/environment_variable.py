@@ -17,7 +17,7 @@ p6slite_videos = '/sdcard/Movies/P6SLite/videos/'
 photo_album = '/sdcard/DCIM/Camera/'
 
 # 存储睿博士邻接表
-cmri_excel_element_dict = "C:\\Users\\Administrator\\Desktop\\临时文件\\cmri_element_dict.xlsx"
+cmri_excel_element_dict = "C:\\Users\\Administrator\\Desktop\\临时文件\\dict_ruiboshi.xlsx"
 
 # 存储睿博士截图文件路径
 ruibo_screenshot_path = '/sdcard/Pictures/P6SLite/screenshot/'

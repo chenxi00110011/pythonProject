@@ -21,14 +21,15 @@ error_dict = {
 }
 
 
-def run_time(func):
-    # 运行花费时间，打印函数或方法的执行时间
+def timer(func):
+    """打印方法的执行时间"""
     def wrapper(*args, **kwargs):
         start_time = time.time()
-        func(*args, **kwargs)
+        result = func(*args, **kwargs)
         end_time = time.time()
-        print("运行时间：%0.6f秒" % (end_time - start_time))
-        return func(*args)
+        execution_time = "{:.6f}".format(end_time - start_time)
+        print(f"Method [{func.__name__}] took {execution_time} seconds to execute.")
+        return result
 
     return wrapper
 

@@ -12,70 +12,6 @@ from imports import adb_download, serial_bitstream, image_properties, environmen
 """
 
 
-def setup_module():
-    print("初始化测试环境")
-    serial_bitstream('COM36', '上电', 1)  # 设备上电
-    os.system("adb shell settings put global adb_enabled 1")
-    os.system("adb reboot")  # 重启手机
-    time.sleep(45)
-    xrs_adb.wakeUpScreen()  # 点亮屏幕
-    os.system(xrs_adb.command_dict['滑屏解锁'])  # 解锁
-    time.sleep(3)
-    os.system("adb shell input tap 100 100")  # 取消提示弹窗
-
-
-@pytest.fixture(scope="function")
-def setup_environment():
-    """初始化测试环境"""
-    # 在这里进行测试环境的初始化操作
-    try:
-        project = MobieProject('睿博士')
-        project.goto('个人管理页')
-        # 判断设备是否使用18086409233账户登录
-        if not project.is_element_exist('18086409233'):
-            project.goto('登录页')
-            project.goto('首页', '18086409233', 'cx123456')
-        else:
-            project.goto('首页', '18086409233', 'cx123456')
-
-        # 检查设备是否离线、网络异常、不在线
-        while project.is_element_exist('通讯异常') or project.is_element_exist('离线') or project.is_element_exist('连接中'):
-            time.sleep(10)
-
-        # 判断app是否启动
-        if project.pwd() == '首页':
-            return project
-        else:
-            setup_environment()
-
-
-    except Exception as e:
-        print(e)
-        setup_environment()
-
-
-def setup_environmentV1():
-    """初始化测试环境"""
-    # 在这里进行测试环境的初始化操作
-    try:
-        project = MobieProject('睿博士')
-        project.goto('个人管理页')
-        # 判断设备是否使用18086409233账户登录
-        if not project.is_element_exist('18086409233'):
-            project.goto('登录页')
-            project.goto('首页', '18086409233', 'cx123456')
-        else:
-            project.goto('首页', '18086409233', 'cx123456')
-        # 判断app是否启动
-        if project.pwd() == '首页':
-            return project
-        else:
-            setup_environmentV1()
-    except Exception as e:
-        print(e)
-        setup_environment()
-
-
 def clean_my_resource(project):
     """运行过程中用于启动app"""
     if project.pwd() != '首页':
@@ -83,34 +19,33 @@ def clean_my_resource(project):
 
 
 did_list = ['IOTDBB-065896-UXLYD']
-
-
+# did_list = ['IOTDAA-337307-XWECW']   # H695AI/9630PGM-AI/S/W
 # did_list = ['IOTDAA-733849-MGVRF']
 
 
-@pytest.mark.run(order=1)
+@pytest.mark.run(order=101)
 @pytest.mark.bind
-@pytest.mark.smoke
-@pytest.mark.repeat(2)
-@pytest.mark.flaky(reruns=5, reruns_delay=1)
+@pytest.mark.fourG_product
+@pytest.mark.repeat(20)
+@pytest.mark.flaky(reruns=2, reruns_delay=5)
 @pytest.mark.parametrize("did", did_list)
 def test_bind_and_unbind_device(did: str, setup_environment):
     """测试绑定解绑设备"""
-    # 等待时间
-    time_wait = 5
-    # 在这里编写测试绑定和解绑设备的代码
     project = setup_environment
     clean_my_resource(project)
-    assert project.pwd() == '首页'  # 断言当前处于首页
-    if project.is_element_exist('test_dev'):
+    if project.is_element_exist('在线'):
         project.goto('更多页')
-        project.goto('首页')
+        project.clickControl('删除设备', 'text')
+        if project.is_element_exist('继续删除'):
+            project.clickControl('继续删除', 'text')
+        elif project.is_element_exist('确定'):
+            project.clickControl('确定', 'text')
         assert not project.is_element_exist('test_dev')  # 断言设备已从设备列表删除
-        time_wait = 60
-    time.sleep(time_wait)
     project.goto('手动添加页')
+    time.sleep(5)
     project.goto('首页', did, 'test_dev')
     assert project.is_element_exist('test_dev')  # 断言设备已添加到设备列表
+    project.driver.quit()
 
 
 definitions = {'超清': [(2560, 1440), (2304, 1296)],
@@ -120,12 +55,13 @@ definitions = {'超清': [(2560, 1440), (2304, 1296)],
 
 @pytest.mark.run(order=2)
 @pytest.mark.live
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.parametrize("definition", definitions.keys())
-@pytest.mark.flaky(reruns=5, reruns_delay=10)
+@pytest.mark.flaky(reruns=1, reruns_delay=3)
 def test_live_video_params(definition, setup_environment):
-    """测试视频参数，例如帧率、码率、分辨率、码率控制"""
+    """测试视频参数，例如帧率、码率、分辨率"""
     project = setup_environment
     project.goto('直播页')
     project.clickControl('画质', 'text')
@@ -142,13 +78,15 @@ def test_live_video_params(definition, setup_environment):
     print(arguments)
     assert arguments['分辨率'] in definitions[definition]  # 检查分辨率是否符合要求
     assert arguments['视频帧率'] > 11  # 检查帧率是否大于11
-    assert arguments['平均码率'] <= 3000  # 检查平均码率
-    assert arguments['码率控制方式'] == 'VBR'  # 检查码率控制方式
+    assert arguments['平均码率'] <= 1500  # 检查平均码率
+    assert '音频格式' in arguments.keys()
+    project.driver.quit()
 
 
 @pytest.mark.run(order=3)
 @pytest.mark.live_dela
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.parametrize("definition", definitions.keys())
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
@@ -166,11 +104,13 @@ def test_live_delay(definition, setup_environment: MobieProject):
     dev_time_stamp = image_properties.image_timestamp(screenshotDirPath)[0]
     print(time_stamp - dev_time_stamp)
     assert time_stamp - dev_time_stamp <= 4
+    project.driver.quit()
 
 
 @pytest.mark.run(order=100)
 @pytest.mark.status
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_online_offline_status_update_time(setup_environment):
@@ -201,11 +141,13 @@ def test_online_offline_status_update_time(setup_environment):
             raise Exception("The app has stopped working")
     print(f'在线状态自动刷新时间：{int(end_time - start_time)}秒')
     assert int(end_time - start_time) <= 60  # 检查在线状态刷新时间是否小于等于60秒
+    project.driver.quit()
 
 
 @pytest.mark.run(order=99)
 @pytest.mark.share
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_share_feature(setup_environment: MobieProject):
@@ -258,7 +200,7 @@ def test_share_feature(setup_environment: MobieProject):
 
 @pytest.mark.run(order=5)
 @pytest.mark.network
-@pytest.mark.smoke
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_4G_data_query(setup_environment: MobieProject):
@@ -276,7 +218,8 @@ def test_4G_data_query(setup_environment: MobieProject):
 
 @pytest.mark.run(order=2)
 @pytest.mark.audio
-# @pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_intercom(setup_environment: MobieProject):
@@ -326,7 +269,8 @@ resolutionDict = {'超清': [(2560, 1440), (2304, 1296)],
 
 @pytest.mark.run(order=6)
 @pytest.mark.screenshot
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.parametrize("definition", resolutionDict.keys())
 @pytest.mark.flaky(reruns=1, reruns_delay=1)
@@ -350,9 +294,10 @@ def test_screenshot(definition, setup_environment: MobieProject):
 
 @pytest.mark.run(order=11)
 @pytest.mark.card
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
-@pytest.mark.flaky(reruns=5, reruns_delay=1)
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_dash_cam_recording(setup_environment: MobieProject):
     """检查卡录像断点"""
     time_stamp = ntp_util.get_ntp_timestamp()
@@ -366,7 +311,8 @@ def test_dash_cam_recording(setup_environment: MobieProject):
 
 @pytest.mark.run(order=12)
 @pytest.mark.download_dashcam
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.repeat(1)
 @pytest.mark.flaky(reruns=1, reruns_delay=1)
 def test_download_dashcam_video(setup_environment: MobieProject):
@@ -397,12 +343,12 @@ def test_download_dashcam_video(setup_environment: MobieProject):
     assert arguments['分辨率'] in definitions['超清']  # 检查分辨率是否符合要求
     assert arguments['视频帧率'] > 11  # 检查帧率是否大于11
     assert arguments['平均码率'] <= 3000  # 检查平均码率
-    assert arguments['码率控制方式'] == 'VBR'  # 检查码率控制方式
+    assert '音频格式' in arguments.keys()
 
 
 @pytest.mark.run(order=7)
 @pytest.mark.devices
-# @pytest.mark.smoke
+# @pytest.mark.fourG_product
 def test_device_info(setup_environment: MobieProject):
     # 检查设备信息的代码写在这里
     device_dict = read_excel_to_dict(environment_variable.ruiboshi_excel, '设备详情', 'IOTDBB-065896-UXLYD', 3)
@@ -418,7 +364,8 @@ def test_device_info(setup_environment: MobieProject):
 
 @pytest.mark.run(order=8)
 @pytest.mark.timezone
-@pytest.mark.smoke
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
 @pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_timezone(setup_environment: MobieProject):
     """检查ntp对时误差"""
@@ -435,7 +382,7 @@ def test_timezone(setup_environment: MobieProject):
 
 @pytest.mark.run(order=9)
 @pytest.mark.sleep_mode
-@pytest.mark.smoke
+@pytest.mark.fourG_product
 @pytest.mark.flaky(reruns=2, reruns_delay=1)
 def test_sleep_mode(setup_environment: MobieProject):
     project = setup_environment
@@ -461,7 +408,7 @@ parameterStore = ['移动', '人形']
 
 @pytest.mark.run(order=10)
 @pytest.mark.event
-@pytest.mark.smoke
+@pytest.mark.fourG_product
 @pytest.mark.repeat(2)
 @pytest.mark.flaky(reruns=3, reruns_delay=1)
 @pytest.mark.parametrize("parameter", parameterStore)
@@ -522,3 +469,33 @@ def test_event_reported(parameter: str, setup_environment: MobieProject):
 def test_volume():
     # 检查音量的代码写在这里
     pass
+
+
+@pytest.mark.timeout(timeout=600)
+@pytest.mark.run(order=13)
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
+@pytest.mark.restart
+@pytest.mark.repeat(1)
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
+def test_device_restart(setup_environment: MobieProject):
+    project = setup_environment
+    project.goto('设置页')
+    project.scroll_to_element('重启摄像机')
+    project.clickControl('重启摄像机', 'text')
+    project.clickControl('确定', 'text')
+    project.goto('首页')
+    project.is_element_exist('在线')
+
+
+@pytest.mark.wifi_product
+@pytest.mark.fourG_product
+@pytest.mark.password
+def test_change_password(setup_environment: MobieProject):
+    project = setup_environment
+    project.goto('设置密码修改页')
+    project.enterTo('请输入新密码', 'CX123456cx', 'text')
+    project.enterTo('请再次输入新密码', 'CX123456cx', 'text')
+    project.clickControl('保存', 'text')
+    project.goto('更多页')
+

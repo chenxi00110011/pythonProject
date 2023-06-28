@@ -4,6 +4,7 @@ import time
 import openpyxl
 from openpyxl import load_workbook
 from environment_variable import ruiboshi_excel
+from my_decorator import timer
 
 dataFile = "./date_dict.txt"
 data_d = {
@@ -155,24 +156,29 @@ def toDictV1(excel_url):
     return return_dict
 
 
-def toDictV2(excel_url, pageName):
+def toDictV2(excel_url, pageName, sheet):
     '''
     将dict_ruiboshi.xlsx中的页面元素转变成邻接表（字典）
     {页面名称:{resource_id,bounds,text,type,default_val}}
+    :param sheet: excel的sheet页名称
+    :param pageName: 页面名称，找出符合条件
     :param excel_url: excel文件路径
     :return: 字典
     '''
     return_dict = dict()
     book = load_workbook(excel_url)
     # sheet = book.active
-    sheet = book['邻接表']
+    sheet = book[sheet]
     if sheet['A1'] is None:
         raise Exception("文件无数据，请检查文件路径是否正确或检查文件数据是否正确")
     i, j = 2, 67  # i表示行号，j表示列号（ascii码）
     while sheet[f'A{i}'].value:
         j = 66
         if sheet[f'A{i}'].value == pageName:
-            if  sheet[f'B{i}'].value not in return_dict:  # 判断页面跳转元素是否已添加，未添加则初始化为[]
+            if not sheet[f'B{i}'].value:
+                i += 1
+                continue
+            if sheet[f'B{i}'].value not in return_dict:  # 判断页面跳转元素是否已添加，未添加则初始化为[]
                 return_dict[sheet[f'B{i}'].value] = []
             return_dict[sheet[f'B{i}'].value].append(dict())
             while sheet[f'{chr(j)}1'].value:
@@ -180,6 +186,7 @@ def toDictV2(excel_url, pageName):
                 j += 1
         i += 1
     return return_dict
+
 
 def toDictV3(excel_url):
     '''
@@ -189,15 +196,14 @@ def toDictV3(excel_url):
     '''
     return_list = list()
     book = load_workbook(excel_url)
-    # sheet = book.active
-    sheet = book['邻接表']
+    sheet = book['page_element']
     if sheet['A1'] is None:
         raise Exception("文件无数据，请检查文件路径是否正确或检查文件数据是否正确")
-    i = 2 # i表示行号
-    while sheet[f'B{i}'].value:
-        if sheet[f'A{i}'].value not in  return_list:
+    i = 2  # i表示行号
+    while sheet[f'A{i}'].value:
+        if sheet[f'A{i}'].value not in return_list:
             return_list.append(sheet[f'A{i}'].value)
-        if sheet[f'B{i}'].value not in  return_list:
+        if sheet[f'B{i}'].value not in return_list and sheet[f'B{i}'].value:
             return_list.append(sheet[f'B{i}'].value)
         i += 1
     return return_list
@@ -212,32 +218,36 @@ def toDictV4(excel_url):
     return_list = list()
     book = load_workbook(excel_url)
     # sheet = book.active
-    sheet = book['邻接表']
+    sheet = book['page_element']
     if sheet['A1'] is None:
         raise Exception("文件无数据，请检查文件路径是否正确或检查文件数据是否正确")
-    i = 2 # i表示行号，66代表B的acsii码
+    i = 2  # i表示行号，66代表B的acsii码
     while sheet[f'A{i}'].value:
-        return_list.append([sheet[f'A{i}'].value])
-        return_list[-1].append(sheet[f'B{i}'].value)
+        if sheet[f'B{i}'].value:
+            return_list.append([sheet[f'A{i}'].value])
+            return_list[-1].append(sheet[f'B{i}'].value)
         i += 1
-    new_li = []     # 去重
+
+    # 去重
+    new_li = []
     for i in return_list:
         if i not in new_li:
             new_li.append(i)
     return new_li
 
 
-def toDictV5(excel_url):
+def toDictV5(excel_url, sheetName='page_element'):
     '''
     将dict_ruiboshi.xlsx中的页面元素转变成邻接表（字典）
     {页面名称:{resource_id,bounds,text,type,default_val}}
+    :param sheetName:
     :param excel_url: excel文件路径
     :return: 字典
     '''
     return_dict = dict()
     book = load_workbook(excel_url)
     # sheet = book.active
-    sheet = book['page']
+    sheet = book[sheetName]
     if sheet['A1'] is None:
         raise Exception("文件无数据，请检查文件路径是否正确或检查文件数据是否正确")
     i, j = 2, 67  # i表示行号，j表示列号（ascii码）
@@ -275,9 +285,9 @@ def read_excel_to_dict(excel_path, worksheet_name, did, did_col=0):
     return result
 
 if __name__ == '__main__':
-    print(read_excel_to_dict(ruiboshi_excel, '设备详情', 'IOTDBB-065896-UXLYD', 3))
+    # print(read_excel_to_dict(ruiboshi_excel, '设备详情', 'IOTDBB-065896-UXLYD', 3))
     # new_dict = {'COM5':'456'}
     # writeToFile(new_dict)
-
+    print(toDictV2(ruiboshi_excel, pageName='首页',sheet='page_element'))
     # tabulation_write(url,'C3',d)
     # print(dictToStr(data_d))
